@@ -62,7 +62,7 @@ static CComment *sharedPlugin;
         NSMenuItem *actionMenuItem = [[NSMenuItem alloc] initWithTitle:MENU_ITEM_TITLE action:@selector(doMenuAction) keyEquivalent:@""];
         [actionMenuItem setTarget:self];
         [actionMenuItem setKeyEquivalent:@"/"];
-        [actionMenuItem setKeyEquivalentModifierMask:NSControlKeyMask | NSCommandKeyMask];
+        [actionMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask];
         [[menuItem submenu] addItem:actionMenuItem];
     }
 }
@@ -74,7 +74,6 @@ static CComment *sharedPlugin;
     
     NSRange range = [[ranges firstObject] rangeValue];
     NSString *commented = [self commentString:textView.textStorage.string range:&range];
-    
     if (commented != nil) {
         [Xcode replaceCharactersInRange:range withString:commented];
     }
@@ -130,14 +129,14 @@ static CComment *sharedPlugin;
     *prange = range;
     
     NSString *value = [source substringWithRange:range];
-    NSInteger result = [self isCommented:&value];
+    NSInteger result = [self isCommentedSingleLine:&value];
     
     if (result > 0) {
         return value;
     } else if (result == 0 || result == -2) {
         return nil;
     } else {
-        return [NSString stringWithFormat:@"/*%@*/", value];
+        return [NSString stringWithFormat:@"//%@", value];
     }
 }
 
@@ -177,7 +176,7 @@ static CComment *sharedPlugin;
     } else if (result == 0 || result == -2) {
         return nil;
     } else {
-        return [NSString stringWithFormat:@"/*%@*/", value];
+        return [NSString stringWithFormat:@"/*\n%@\n*/", value];
     }
 }
 
@@ -201,6 +200,19 @@ static CComment *sharedPlugin;
             value = [value mutableCopy];
             [(NSMutableString *)value deleteCharactersInRange:NSMakeRange(r.location + r.length - 2, 2)];
             [(NSMutableString *)value deleteCharactersInRange:NSMakeRange(r.location, 2)];
+            
+            /**
+             *  如果收尾包含一个换行符，删除该换行符，主要目的和加注释的地方配对 \n%@\n
+             */
+            if ([value hasSuffix:@"\n"]) {
+                
+                //[(NSMutableString *)value deleteCharactersInRange:NSMakeRange(r.location, )];
+                value = [value substringToIndex:value.length - 1];
+            }
+            if ([value hasPrefix:@"\n"]) {
+                
+                value = [value substringFromIndex:1];
+            }
             *pvalue = [value copy];
             return 1;
         } else {
@@ -213,6 +225,20 @@ static CComment *sharedPlugin;
     }
     
     return -1;
+}
+
+- (NSInteger) isCommentedSingleLine:(NSString **) pvalue {
+    
+    NSString *value = *pvalue;
+    if ([value hasPrefix:@"//"]) {
+        
+        *pvalue = [[value substringFromIndex:2] copy];
+        return 1;
+    }
+    else {
+        
+        return -1;
+    }
 }
 
 - (BOOL)isHalfCommented:(NSString *)value
